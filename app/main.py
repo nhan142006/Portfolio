@@ -4,8 +4,6 @@ A deliberately small web API. You will containerise it in Lab 2,
 connect it to PostgreSQL in Week 4, deploy it in Lab 3 and test it
 in a pipeline from Week 6.
 """
-import os
-MISSING = os.environ["DEFINITELY_NOT_SET"]
 
 import os
 import psycopg
