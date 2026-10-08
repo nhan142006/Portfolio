@@ -6,11 +6,13 @@ in a pipeline from Week 6.
 """
 
 import os
-
+import psycopg
 from fastapi import FastAPI, HTTPException
 
 APP_NAME = os.getenv("APP_NAME", "sdp-starter")
 APP_VERSION = "0.1.0"
+
+DATABASE_URL = os.environ["DATABASE_URL"]
 
 app = FastAPI(title=APP_NAME, version=APP_VERSION)
 
@@ -32,6 +34,14 @@ def root():
 def health():
     """Used by Render (Lab 3) and the pipeline (Week 6) to check the app is alive."""
     return {"status": "ok"}
+
+
+@app.get("/health/db")
+def health_db():
+    """Proves connection to PostgreSQL database by querying table 'notes'."""
+    with psycopg.connect(DATABASE_URL, connect_timeout=3) as conn:
+        n = conn.execute("SELECT count(*) FROM notes").fetchone()[0]
+        return {"db": "ok", "notes": n}
 
 
 @app.get("/items")
