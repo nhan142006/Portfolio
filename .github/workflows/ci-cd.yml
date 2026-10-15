@@ -17,4 +17,6 @@ jobs:
       - name: Lint
         run: ruff check
       - name: Test
+        env:
+          DATABASE_URL: sqlite:///./test.db
         run: pytest -q
