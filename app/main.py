@@ -6,8 +6,8 @@ in a pipeline from Week 6.
 """
 
 import os
-import psycopg
-from fastapi import FastAPI, HTTPException
+   from fastapi import FastAPI, HTTPException
+   import psycopg
 
 APP_NAME = os.getenv("APP_NAME", "sdp-starter")
 APP_VERSION = "0.1.0"
