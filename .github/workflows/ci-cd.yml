@@ -20,3 +20,13 @@ jobs:
         env:
           DATABASE_URL: sqlite:///./test.db
         run: pytest -q
+
+deploy:
+    needs: check
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger the Render deploy
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: curl -fsS -X POST "$HOOK"
