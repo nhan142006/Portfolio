@@ -6,7 +6,6 @@ in a pipeline from Week 6.
 """
 
 import os
-
 from fastapi import FastAPI, HTTPException
 import psycopg
 
