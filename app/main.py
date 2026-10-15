@@ -10,7 +10,7 @@ import psycopg
 from fastapi import FastAPI, HTTPException
 
 APP_NAME = os.getenv("APP_NAME", "sdp-starter")
-APP_VERSION = "0.1.0"
+APP_VERSION = "1.2.0"
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 
