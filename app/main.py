@@ -1,57 +1,61 @@
-"""Starter application for 72ITDS30103 Software Development Platforms.
-
-A deliberately small web API. You will containerise it in Lab 2,
-connect it to PostgreSQL in Week 4, deploy it in Lab 3 and test it
-in a pipeline from Week 6.
-"""
+# app/main.py — after Session 14, Task D: one small, self-healing pool.
 import os
+from contextlib import asynccontextmanager
 
-import psycopg
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+from psycopg_pool import ConnectionPool
 
-APP_NAME = os.getenv("APP_NAME", "sdp-starter")
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.3.0"  # Task D: the visible change for this pull request
+APP_ENV = os.environ.get("APP_ENV", "development")
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/postgres"
+)
 
-DATABASE_URL = os.environ["DATABASE_URL"]
+# One pool per running copy of the app. Created closed: tests can import this
+# file without a database; the server opens it at start-up (lifespan below).
+pool = ConnectionPool(
+    DATABASE_URL,
+    min_size=1,
+    max_size=5,                             # small pool: several copies run
+    max_lifetime=300,                       # recycle: replace after 5 minutes
+    check=ConnectionPool.check_connection,  # pre-ping: test before lending
+    kwargs={
+        "prepare_threshold": None,          # port 6543: no prepared statements
+        "connect_timeout": 5,               # fail fast instead of hanging
+    },
+    open=False,
+)
 
-app = FastAPI(title=APP_NAME, version=APP_VERSION)
 
-# In-memory data. Week 4 replaces this with a PostgreSQL table.
-ITEMS = [
-    {"id": 1, "name": "Write a Dockerfile", "done": False},
-    {"id": 2, "name": "Run it with Compose", "done": False},
-    {"id": 3, "name": "Deploy it to Render", "done": False},
-]
+@asynccontextmanager
+async def lifespan(app):
+    pool.open()   # does not wait: the app starts even if the database is paused
+    yield
+    pool.close()  # Render stops the container: return the connections cleanly
+
+
+app = FastAPI(title="notes", lifespan=lifespan)
 
 
 @app.get("/")
-def root():
-    """Proves the app is reachable. Open /docs for the interactive API page."""
-    return {"app": APP_NAME, "version": APP_VERSION, "message": "Hello from the starter app"}
+def home():
+    return {"app": "notes", "status": "running", "version": APP_VERSION, "env": APP_ENV}
 
 
 @app.get("/health")
 def health():
-    """Used by Render (Lab 3) and the pipeline (Week 6) to check the app is alive."""
+    # Fast, no login, touches nothing. Render's health check path points here.
     return {"status": "ok"}
 
 
 @app.get("/health/db")
 def health_db():
-    """Proves connection to PostgreSQL database by querying table 'notes'."""
-    with psycopg.connect(DATABASE_URL, connect_timeout=3) as conn:
-        n = conn.execute("SELECT count(*) FROM notes").fetchone()[0]
+    # Proves the database works. Borrows a connection from the pool for one query.
+    try:
+        with pool.connection(timeout=5) as conn:
+            n = conn.execute("SELECT count(*) FROM notes").fetchone()[0]
         return {"db": "ok", "notes": n}
-
-
-@app.get("/items")
-def list_items():
-    return ITEMS
-
-
-@app.get("/items/{item_id}")
-def get_item(item_id: int):
-    for item in ITEMS:
-        if item["id"] == item_id:
-            return item
-    raise HTTPException(status_code=404, detail="Item not found")
+    except Exception as err:  # noqa: BLE001
+        print("health/db failed:", type(err).__name__, err)  # details to the logs only
+        return JSONResponse(status_code=503, content={"db": "error"})
